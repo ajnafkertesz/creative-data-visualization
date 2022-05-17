@@ -1,0 +1,173 @@
+---
+title: "Creative Data Visualization"
+author: "Ajna Kertesz"
+date: '2022-05-16'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prepearing the data
+
+For this creative data visualization project, I decided to work with a large survey dataset from my lab. We collected data from 11 countries to explore individual's self-reported compliance with health behaviors, their COVID-19 risk perception and their Cultural Tightness-Looseness Scores. Even though most of the data cleaning is done, let's go ahead a select the specific variables we will work with.
+
+```{r load data and libs, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(gdtools)
+library(hrbrthemes)
+library(viridis)
+library(plotly)
+library(heatmap3)
+
+# Load data 
+CTL_wax <- read_csv("~/Desktop/Data Analaysis Course/creative-data-visualization/CTL_wax.csv")
+
+
+# Select variables
+data <- CTL_wax %>% 
+  group_by(fieldsite) %>%
+  summarise_all(funs(mean(., na.rm=TRUE))) %>%
+  mutate(fieldsite = factor(fieldsite, levels(as.factor(fieldsite))))
+
+# Matrix format
+mat <- data 
+mat <- mat %>% dplyr::select(HandWash, HandDisinfect, StayHome, Antibact, MaskFreq, AvoidPublic, Stockup, AltRem, CoverCough, SocDist)
+rownames(mat) <- c("BZ","CH","GM","IN","IS","JP","MX","RU","SA","UK","US")
+mat <- as.matrix(mat)
+
+```
+
+## Heatmap
+
+First, I decided to map the countries by the frequency of 10 different health behaviors. Participants were asked how frequently do they engage in the following health behaviors: Hand washing, Hand disinfecting, Staying at home, Using antibiotic products, Wear face masks, Avoid public gatherings, Stock up on food and other resources, Cover their cough and social distance. They responded with a number 1-7, where 1 indicated not at all and 7 meant "multiple times a day".
+
+```{r heatmap, echo=FALSE, message=FALSE, warning=FALSE}
+
+library(heatmaply)
+p <- heatmaply(
+  percentize(mat), 
+        dendrogram = "none",
+        xlab = "Health Behaviors", 
+        ylab = "Countries", 
+        main = "Health Behaviors by Country",
+        #legend(x="right", legend=c(),fill=heat.colors(7)),
+        col = heat.colors(7),
+        scale = "column",
+        margins = c(60,100,40,20),
+        grid_color = "white",
+        grid_width = 0.00001,
+        titleX = FALSE,
+        hide_colorbar = TRUE,
+        branches_lwd = 0.1,
+        label_names = c("Fieldsite", "Feature", "Value"),
+        fontsize_row = 5, fontsize_col = 5,
+        labCol = colnames(mat),
+        labRow = rownames(mat),
+        heatmap_layers = theme(axis.line=element_blank())
+        )
+
+p
+
+```
+
+
+## Bubble plot
+
+Next, I used a bubble plot to explore the relationship (if any) between three different compliance measures (vaccine willingness, vaccination status and frequency of mask wearing) and Cultural Tightness-Looseness scores. The literature stuggests that higher CTL scores (tighter cultures) are more likely to enagege in norm compliance, which can also be seen from my visualization (though it is probably not all significant).
+
+```{r bubbleplot, echo=FALSE, meassge=FALSE, warning=FALSE}
+#wax willing
+data(CTL_wax, package="ggplot2")
+
+theme_set(theme_bw())  # pre-set the bw theme.
+g <- ggplot(CTL_wax, aes(CTL_c, WaxWilling)) + 
+  labs(title="Relationship between Cultural Tightness-Looseness and vaccine willingness")
+g + geom_jitter(aes(col=fieldsite),with=NULL, height=NULL) + 
+  geom_smooth(aes(col=fieldsite), method="lm", se=F)
+
+
+#vaccination status
+data(CTL_wax, package="ggplot2")
+
+theme_set(theme_bw())  # pre-set the bw theme.
+g <- ggplot(CTL_wax, aes(CTL_c, Vaccinated)) + 
+  labs(title="Relationship between Cultural Tightness-Looseness and vaccination status")
+g + geom_jitter(aes(col=fieldsite),with=NULL, height=NULL) + 
+  geom_smooth(aes(col=fieldsite), method="lm", se=F)
+
+#frequency of mask wearing
+data(CTL_wax, package="ggplot2")
+
+theme_set(theme_bw())  # pre-set the bw theme.
+g <- ggplot(CTL_wax, aes(CTL_c, MaskFreq)) + 
+  labs(title="Relationship between Cultural Tightness-Looseness and frequency of mask-wearing")
+g + geom_jitter(aes(col=fieldsite),with=NULL, height=NULL) + 
+  geom_smooth(aes(col=fieldsite), method="lm", se=F)
+
+
+
+```
+
+## Corrolerogram
+
+Another intersting way to understand CTL is threat perception. It is assumed that higher levels of precieved threat lead to more cultural tightening. I found some week evidence for this when I plotted different threat levels (self, family, community, country, composite score) against CTL.
+
+```{r corrolelo, echo=FALSE, meassage=FALSE,warning=FALSE}
+
+library(ggcorrplot)
+
+CTL_select<- CTL_wax%>%select(threat_c, selfthreat_c, famthreat_c, commthreat_c, countrythreat_c, CTL_c)
+
+# Correlation matrix
+data(CTL_select)
+corr <- round(cor(CTL_select), 1)
+
+# Plot
+ggcorrplot(corr, hc.order = TRUE, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3, 
+           method="circle", 
+           colors = c("orange", "white", "blue"), 
+           title="Correlogram of different levels of threat and CTL", 
+           ggtheme=theme_bw)
+
+
+```
+
+## Boxplots
+
+Lastly, I used boxplots to see the variation in threat perception, CTL scores and vaccine willingness across countries.
+
+```{r boxplot, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+theme_set(theme_classic())
+
+g <- ggplot(CTL_wax, aes(fieldsite, threat_c))
+g + geom_boxplot(varwidth=T, fill="plum") + 
+    labs(title="COVID-19 threat pereception by country",
+         caption="Source: Qualtrics Panels",
+         x="Country",
+         y="COVID-19 Threat")
+
+g <- ggplot(CTL_wax, aes(fieldsite, CTL_c))
+g + geom_boxplot(varwidth=T, fill="plum") + 
+    labs(title="Centered CTL scores by country",
+         caption="Source: Qualtrics Panels",
+         x="Country",
+         y="Centered CTL scores")
+
+g <- ggplot(CTL_wax, aes(fieldsite, WaxWilling))
+g + geom_boxplot(varwidth=T, fill="plum") + 
+    labs(title="Self-reported vaccine willingess by country",
+         caption="Source: Qualtrics Panels",
+         x="Country",
+         y="Vaccine Willingness")
+
+```
+
+
